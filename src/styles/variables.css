@@ -1,0 +1,71 @@
+/* src/styles/variables.css */
+:root {
+  /* Colors */
+  --color-outer-bg: #edf2f2;
+  --color-outer-bg-soft: #f4f7f6;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-surface-card: #ffffff;
+
+  /* Hero Gradient */
+  --hero-gradient: linear-gradient(135deg, #e7f7f2 0%, #f5f8fd 52%, #f2edf8 100%);
+  --hero-teal-card: #103838;
+  --hero-teal-card-hover: #144545;
+
+  /* Typography Colors */
+  --color-heading: #0a2524;
+  --color-text-body: #334b49;
+  --color-text-muted: #5e7774;
+  --color-text-light: #8ba29f;
+
+  /* Accent & Gradients */
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-primary-dark: #0f3333;
+  --color-primary-light: #ccfbf1;
+  --color-primary-subtle: #f0fdfa;
+
+  --color-secondary: #2563eb;
+  --color-secondary-hover: #1d4ed8;
+
+  --gradient-accent: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+  --gradient-accent-text: linear-gradient(135deg, #0d9488 0%, #10b981 100%);
+  --gradient-brand-pill: linear-gradient(135deg, #0d9488 0%, #059669 100%);
+
+  /* UI Status Colors */
+  --color-success: #10b981;
+  --color-success-bg: #ecfdf5;
+  --color-warning: #f59e0b;
+  --color-warning-bg: #fffbeb;
+  --color-danger: #ef4444;
+  --color-danger-bg: #fef2f2;
+  --color-info: #0284c7;
+  --color-info-bg: #f0f9ff;
+
+  /* Borders & Dividers */
+  --color-border: #e2ece9;
+  --color-border-subtle: #edf4f2;
+  --color-border-focus: #0d9488;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(10, 37, 36, 0.05);
+  --shadow-md: 0 4px 14px rgba(10, 37, 36, 0.06);
+  --shadow-lg: 0 12px 30px rgba(10, 37, 36, 0.08);
+  --shadow-xl: 0 20px 48px rgba(10, 37, 36, 0.1);
+  --shadow-canvas: 0 25px 60px -12px rgba(14, 40, 36, 0.09);
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Max Widths */
+  --container-max-width: 1240px;
+}
