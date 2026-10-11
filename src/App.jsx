@@ -21,6 +21,7 @@ import HowItWorksPage from './pages/HowItWorksPage';
 import MyDonationsPage from './pages/MyDonationsPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import ProfilePage from './pages/ProfilePage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 // Helper component that scrolls window to top on route change
 function ScrollToTop() {
@@ -51,6 +52,7 @@ export default function App() {
                   <Route path="/how-it-works" element={<HowItWorksPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                   {/* Protected Student Routes */}
                   <Route

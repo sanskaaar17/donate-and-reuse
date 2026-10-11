@@ -64,9 +64,14 @@ export default function DonatePage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('File size exceeds 5MB limit. Please choose a smaller photo.');
+        setServerError('File size exceeds 5MB. Please choose a smaller photo.');
         return;
       }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setServerError('Choose a JPG, PNG, or WebP image.');
+        return;
+      }
+      setServerError(null);
       setImageFile(file);
       setFilePreview(URL.createObjectURL(file));
     }

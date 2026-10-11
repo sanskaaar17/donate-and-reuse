@@ -1,124 +1,86 @@
-# Donate & Reuse — Engineering Common Engagement Project (CEP)
-**Frontend Prototype (Phase 1)**
+# Donate & Reuse
 
-> **Tagline:** Give What You Can. Get What You Need.  
-> **Mission:** A sustainable, 100% free peer-to-peer campus resource exchange helping engineering students and community members give textbooks, calculators, lab gear, and supplies a second life.
+A React 18 + Vite campus exchange application. The existing frontend and design system are retained; donation listings, requests, profiles, and authentication are integrated with Supabase.
 
----
-
-## 🎨 Visual Design Inspiration
-Inspired by the modern, premium aesthetic of top-tier consumer apps, adapted specifically for community reuse:
-- **Outer Canvas:** Soft ambient pastel backdrop with a floating, rounded main application container (`border-radius: 28px`).
-- **Hero Canvas:** Gentle mint-to-lavender gradient with large bold editorial typography and green-teal gradient accents.
-- **Asymmetric Visual Showcase:** Large dark teal promotional card featuring campus sustainability goals, paired with rounded photographic tiles of real academic supplies (scientific calculators, engineering drawing kits, textbooks, and campus gear).
-- **Signature Feature — College Essentials:** Dedicated highlight for course materials, previous year notes, lab coats, and breadboard electronics.
-
----
-
-## 🛠 Tech Stack
-- **Framework:** React 18 with Vite 6
-- **Language:** JavaScript (ES Modules, strictly no TypeScript)
-- **Routing:** React Router v6 (`react-router-dom`)
-- **Icons:** Lucide React (`lucide-react`)
-- **Styling:** Pure Plain CSS (CSS Variables, modular files, responsive without external UI frameworks)
-- **State Management:** In-memory React Context (`ItemsContext`) allowing real-time simulated donations and item reservation toggles without a backend.
-
----
-
-## 📂 Project Directory Structure
+## Folder structure
 
 ```text
 donate-and-reuse/
-├── index.html                  # HTML entry with Plus Jakarta Sans & Inter fonts
-├── package.json                # Project dependencies and npm scripts
-├── vite.config.js              # Vite configuration (port 3000)
-├── README.md                   # Project documentation & verification checklist
+├── index.html
+├── package.json
+├── .env.example
+├── README.md
+├── supabase/
+│   ├── schema.sql       # Tables, validation, RLS, RPCs, and Storage policies
+│   └── seed.sql         # Optional sample listings for a registered profile
 └── src/
-    ├── main.jsx                # Application root entry point
-    ├── App.jsx                 # Top-level routing, layout wrapper & providers
-    ├── index.css               # Central stylesheet loading tokens and resets
-    ├── styles/
-    │   ├── variables.css       # Design tokens (colors, gradients, shadows, radii)
-    │   ├── layout.css          # Canvas container, navbar, footer, responsive grids
-    │   ├── components.css      # Buttons, badges, cards, modals, toast, search filters
-    │   └── pages.css           # Hero section, college banner, auth styling, impact metrics
-    ├── data/
-    │   └── demoData.js         # Realistic listings, categories, subcategories, metrics
+    ├── App.jsx
+    ├── components/      # Existing shared UI and route guard
     ├── context/
-    │   └── ItemsContext.jsx    # In-memory reactive state (items, addItem, modal, toast)
-    ├── components/
-    │   ├── Navbar.jsx          # Header with active indicators & responsive mobile drawer
-    │   ├── Footer.jsx          # Multi-column footer with project mission & links
-    │   ├── Hero.jsx            # Asymmetric hero showcase matching screenshot layout
-    │   ├── DonationCard.jsx    # Card with image fallback, condition badge & location
-    │   ├── ItemDetailModal.jsx # Accessible popup with full donor details & reserve action
-    │   ├── SearchAndFilters.jsx# Real-time search, category pills & condition dropdowns
-    │   ├── CollegeEssentialsSection.jsx # Reusable signature spotlight component
-    │   ├── EmptyState.jsx      # Friendly zero-results UI with filter reset trigger
-    │   └── Toast.jsx           # Animated floating feedback notifications
-    └── pages/
-        ├── HomePage.jsx        # Landing page with hero, spotlight, recent items & impact
-        ├── ExplorePage.jsx     # Full catalog with dynamic search, multi-filters & cards
-        ├── CollegeEssentialsPage.jsx # Signature hub with 8 specialized subcategories
-        ├── DonatePage.jsx      # Form with conditional subcategory selector & live preview
-        ├── LoginPage.jsx       # Email & password with show/hide toggle (UI preview)
-        ├── RegisterPage.jsx    # Account registration with password matching (UI preview)
-        └── HowItWorksPage.jsx  # Safe handover guide, condition rubric & FAQs
+    │   ├── AuthContext.jsx
+    │   └── ItemsContext.jsx
+    ├── data/
+    │   └── demoData.js  # Form choices and static site content only (no sample listings)
+    ├── lib/
+    │   └── supabase.js
+    ├── pages/           # Existing routes including Explore, Donate, and account dashboards
+    └── styles/          # Existing CSS design system, unchanged
 ```
 
----
+## Supabase setup
 
-## 🚀 Running the Project Locally
+1. Create a Supabase project.
+2. Open **SQL Editor**, paste all of [`supabase/schema.sql`](./supabase/schema.sql), and run it. This creates `profiles`, `donations`, and `item_requests`, their validation and RLS rules, request RPCs, and the public image bucket with upload restrictions.
+3. In **Project Settings → API**, copy the Project URL and the browser-safe publishable key (or legacy anon key).
+4. Copy `.env.example` to `.env` and fill in the values:
 
-The development server is already compiled and running. If you ever need to restart or run it manually:
+   ```env
+   VITE_SUPABASE_URL=https://your-project-id.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+   ```
 
-### 1. Install Dependencies
+   `VITE_SUPABASE_ANON_KEY` is accepted for legacy anon keys. Never use a `service_role` or secret key in a `VITE_` variable or browser code.
+5. In **Authentication → URL Configuration**, set `http://localhost:3000` as a Site URL and add both `http://localhost:3000` and `http://localhost:3000/reset-password` as allowed redirect URLs. Email confirmation can remain enabled; users must confirm their email before sign-in if it is required by your project.
+6. Restart Vite after changing `.env`.
+
+The SQL file is designed for a new project and replaces the policies created by the earlier Phase 2 attempt. Re-running the file is safe for the current table/policy/function names. Back up existing data before applying schema changes to a populated project. The optional `supabase/seed.sql` inserts sample donations for an already-registered profile; run it only when demo listings are useful.
+
+## Run locally
+
 ```bash
 npm install
-```
-
-### 2. Start the Dev Server
-```bash
 npm run dev
 ```
-Open your browser to: **`http://localhost:3000/`**
 
-### 3. Production Build & Preview
+Vite serves the app at `http://localhost:3000`. Production build:
+
 ```bash
 npm run build
 npm run preview
 ```
 
----
+## Backend overview (viva)
 
-## 🧪 Browser Verification Checklist
+- Supabase Auth verifies email/password and persists the browser session. React listens for login, logout, refresh, and expired-session changes; protected routes send signed-out visitors to Login.
+- PostgreSQL stores profile, donation, and request rows. The browser receives only a publishable key; Row Level Security uses `auth.uid()` to identify the current user and restricts each operation.
+- Donation categories, the eight College Essentials subcategories, conditions, required fields, and request statuses are checked in the database as well as validated in the form.
+- Request creation is checked by a database trigger, which rejects self-requests, unavailable listings, and spoofed requester IDs. A partial unique index prevents duplicate active requests.
+- Accepting a request calls a PostgreSQL function inside one transaction. It locks the donation row, checks the caller is its owner, accepts one pending request, declines other pending requests, and reserves the donation. A unique index also prevents more than one accepted request per item.
+- Contact details are not available from public profile queries. A security-definer function returns them to the donor/requester only for an accepted request.
+- Optional images are stored in Supabase Storage under the signed-in user's folder. The bucket enforces a 5MB limit and JPG/PNG/WebP MIME types; Storage policies restrict uploads and changes to that user's folder.
 
-Verify the following key interactions in your browser:
+## Manual testing checklist
 
-1. **Home Page (`/`)**:
-   - Check the soft outer background and large rounded canvas container.
-   - Verify the editorial headline with the teal-to-green gradient highlight.
-   - Verify the dark teal promotional card and asymmetric photo tiles.
-   - Click "Explore Items →" or "Donate an Item" and ensure navigation works smoothly.
-2. **Explore Items (`/explore`)**:
-   - Type in the search box (e.g., "calculator", "library", or "lab") to see instant filtering.
-   - Click category filter pills (e.g. "College Essentials", "Books", "Clothes").
-   - Change the Condition filter (e.g. "Like New").
-   - Click "Clear Filters" to reset.
-   - Click any card's **"Details"** button to open the Item Detail modal.
-   - In the modal, click **"Request This Item (Demo Reserve)"** to watch its status change to "Reserved" and trigger a toast notice!
-3. **College Essentials (`/college-essentials`)**:
-   - Verify the graduation-cap header banner and description.
-   - Click across the 8 subcategory pills (e.g., *Scientific Calculators & Drawing Instruments*, *Lab Coats & Lab Supplies*, *Textbooks & Reference Books*).
-4. **Donate an Item (`/donate`)**:
-   - Notice the College Subcategory dropdown only appears when "College Essentials" is selected.
-   - Try submitting with empty fields to observe client validation feedback.
-   - Fill in a test listing, pick one of the quick photo presets (or leave the default), and submit.
-   - Confirm that the new item is stored in React state and immediately appears in `/explore` and `/college-essentials`!
-5. **How It Works (`/how-it-works`)**:
-   - Review the 3-step exchange process, the condition rating guide, campus handover safety tips, and FAQs.
-6. **Login (`/login`) & Register (`/register`)**:
-   - Test password show/hide eye toggle button.
-   - Verify client-side field validation and clear disclaimers that backend authentication will be connected in Phase 3.
-7. **Mobile Responsiveness**:
-   - Resize your browser window below 768px and verify the mobile hamburger menu opens and closes cleanly with all navigation links.
+Use two independent browser profiles (or one normal and one private window), and create accounts **A** and **B**.
+
+1. Register A and B with different email addresses. Confirm email if enabled, log in, refresh, and verify the session remains active. Log out and confirm protected routes redirect to Login.
+2. As A, publish a donation in each flow you want to check, including College Essentials and each of its eight subcategories. Verify the category/subcategory/condition and required-field validation; try a JPG/PNG/WebP image under 5MB and a rejected type/oversized image.
+3. As a signed-out visitor, browse, search, and filter live donations. Verify the home/explore/College Essentials pages show the database rows and a meaningful empty or connection error when none are available.
+4. As A, open A's own listing and attempt to request it. The interface and database must reject the self-request.
+5. As B, request A's available item. Submit a second active request from B for that same item; it must be rejected. Verify B sees it in My Requests and A sees it in My Donations.
+6. As an unrelated/unauthorized account, try to accept/decline A's request or update/delete A's donation. These operations must fail. Public pages should not reveal profile phone/email.
+7. As A, accept B's request. Confirm the item becomes Reserved atomically, other pending requests become Declined, B sees contact details only after acceptance, and a second request/acceptance cannot reserve the item again.
+8. As A, decline a different pending request and verify it is reflected for the requester. Complete a reserved handover and verify the listing becomes Completed.
+9. Cancel a pending request as its requester, delete an owned listing, and confirm both dashboards refresh. Try direct browser reloads on protected routes after logging out and after the auth session expires.
+
+This repository has no automated test script configured. `npm run build` is the available repository-level verification command; the two-account and database-policy checks above require an actual Supabase project and must be run manually.

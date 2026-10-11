@@ -20,10 +20,11 @@ import {
 import DonationCard from '../components/DonationCard';
 import EmptyState from '../components/EmptyState';
 import { useItems } from '../context/ItemsContext';
+import { Loader2 } from 'lucide-react';
 import { COLLEGE_SUBCATEGORIES, CONDITIONS } from '../data/demoData';
 
 export default function CollegeEssentialsPage() {
-  const { items } = useItems();
+  const { items, loadingItems, itemsError, fetchItems } = useItems();
   const [selectedSubcat, setSelectedSubcat] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCondition, setSelectedCondition] = useState('All');
@@ -266,8 +267,24 @@ export default function CollegeEssentialsPage() {
         </div>
       </div>
 
+      {itemsError && (
+        <div className="demo-banner-box" role="alert" style={{ marginBottom: '24px' }}>
+          <span>{itemsError}</span>
+          {itemsError.includes('Configure Supabase') ? null : (
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => fetchItems().catch((error) => console.error('Retrying donations failed:', error))}>
+              Retry
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Results Grid */}
-      {filteredItems.length > 0 ? (
+      {loadingItems ? (
+        <div role="status" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)' }}>
+          <Loader2 size={30} className="spin-animation" style={{ margin: '0 auto 10px' }} />
+          <div>Loading College Essentials...</div>
+        </div>
+      ) : filteredItems.length > 0 ? (
         <div className="donation-grid">
           {filteredItems.map((item) => (
             <DonationCard key={item.id} item={item} />

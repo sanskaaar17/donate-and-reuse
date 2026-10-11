@@ -24,15 +24,18 @@ export default function MyRequestsPage() {
   const { user } = useAuth();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
 
   const loadRequests = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchMyRequests();
       setRequests(data);
     } catch (err) {
       console.error('Failed to load requests:', err);
+      setLoadError(err.message || 'Unable to load your requests.');
     } finally {
       setLoading(false);
     }
@@ -75,6 +78,11 @@ export default function MyRequestsPage() {
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-primary)' }}>
           <Loader2 size={36} className="spin-animation" style={{ margin: '0 auto 12px' }} />
           <p style={{ color: 'var(--color-text-muted)' }}>Loading your requests...</p>
+        </div>
+      ) : loadError ? (
+        <div className="demo-banner-box" role="alert">
+          <span>{loadError}</span>
+          <button type="button" className="btn btn-sm btn-outline" onClick={loadRequests}>Retry</button>
         </div>
       ) : requests.length === 0 ? (
         <EmptyState

@@ -1,38 +1,83 @@
-// src/context/ItemsContext.jsx
-// Manages Database-backed Donations, Item Requests, Storage Uploads, and Fallback Demo Data
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { INITIAL_DEMO_ITEMS, DEFAULT_FALLBACK_IMAGE } from '../data/demoData';
+import { CATEGORIES, COLLEGE_SUBCATEGORIES, CONDITIONS, DEFAULT_FALLBACK_IMAGE } from '../data/demoData';
 import { useAuth } from './AuthContext';
 
 const ItemsContext = createContext(null);
 
+function requireSupabase(configured) {
+  if (!configured) {
+    throw new Error('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) in .env, then restart Vite.');
+  }
+}
+
+function throwRpcError(data, error) {
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.error || 'The requested operation could not be completed.');
+}
+
+function formatTimeAgo(timestamp) {
+  if (!timestamp) return 'Recently';
+  const date = new Date(timestamp);
+  const diffMs = Date.now() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 5) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+function presentDonation(row) {
+  const donor = row.donor || row.profiles || {};
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    subcategory: row.subcategory,
+    condition: row.condition,
+    location: row.location,
+    status: row.status,
+    donorId: row.donor_id,
+    donorName: donor.full_name || 'Campus Contributor',
+    donorRole: donor.campus_role || 'Engineering Student',
+    donorDepartment: donor.department || 'Engineering',
+    postedDate: formatTimeAgo(row.created_at),
+    description: row.description,
+    imageUrl: row.image_url || DEFAULT_FALLBACK_IMAGE,
+    tags: row.tags || [row.category],
+    pickupTimes: row.pickup_times || 'Flexible on campus',
+    createdAt: row.created_at
+  };
+}
+
 export function ItemsProvider({ children }) {
   const { user } = useAuth();
-  const [items, setItems] = useState(INITIAL_DEMO_ITEMS);
+  const configured = isSupabaseConfigured();
+  const [items, setItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(true);
+  const [itemsError, setItemsError] = useState(null);
   const [selectedItem, setSelectedItem] = useState(null);
   const [toast, setToast] = useState(null);
-  const isConfigured = isSupabaseConfigured();
 
-  const showToast = (message, type = 'success') => {
+  const showToast = useCallback((message, type = 'success') => {
     setToast({ id: Date.now(), message, type });
-  };
-
-  const hideToast = () => {
+  }, []);
+  const hideToast = useCallback(() => {
     setToast(null);
-  };
+  }, []);
 
-  // --------------------------------------------------------------------------
-  // 1. FETCH DONATIONS FROM SUPABASE (OR FALLBACK TO DEMO DATA)
-  // --------------------------------------------------------------------------
   const fetchItems = useCallback(async () => {
     setLoadingItems(true);
-    if (!isConfigured) {
-      // Use local demo data
-      setItems(INITIAL_DEMO_ITEMS);
+    setItemsError(null);
+    if (!configured) {
+      setItems([]);
+      setItemsError('Configure Supabase to browse live donations.');
       setLoadingItems(false);
-      return;
+      return [];
     }
 
     try {
@@ -40,221 +85,93 @@ export function ItemsProvider({ children }) {
         .from('donations')
         .select(`
           *,
-          profiles:donor_id (
-            id,
-            full_name,
-            campus_role,
-            department,
-            email,
-            phone
-          )
+          donor:profiles!donations_donor_id_fkey(id, full_name, campus_role, department)
         `)
         .order('created_at', { ascending: false });
-
-      if (error) {
-        console.warn('Supabase donations query notice:', error.message);
-        // Fallback to demo items if database table is not created yet
-        setItems(INITIAL_DEMO_ITEMS);
-      } else if (data && data.length > 0) {
-        // Map database columns to app property names
-        const formatted = data.map((d) => ({
-          id: d.id,
-          title: d.title,
-          category: d.category,
-          subcategory: d.subcategory,
-          condition: d.condition,
-          location: d.location,
-          status: d.status,
-          donorId: d.donor_id,
-          donorName: d.profiles?.full_name || 'Campus Contributor',
-          donorRole: d.profiles?.campus_role || 'Engineering Student',
-          donorDepartment: d.profiles?.department || 'Engineering',
-          donorEmail: d.profiles?.email,
-          donorPhone: d.profiles?.phone,
-          postedDate: formatTimeAgo(d.created_at),
-          description: d.description,
-          imageUrl: d.image_url || DEFAULT_FALLBACK_IMAGE,
-          tags: d.tags || [d.category],
-          pickupTimes: d.pickup_times || 'Flexible on campus',
-          createdAt: d.created_at
-        }));
-        setItems(formatted);
-      } else {
-        // Table exists but is empty
-        setItems([]);
-      }
-    } catch (err) {
-      console.error('Error fetching donations:', err);
-      setItems(INITIAL_DEMO_ITEMS);
+      if (error) throw error;
+      const nextItems = (data || []).map(presentDonation);
+      setItems(nextItems);
+      return nextItems;
+    } catch (error) {
+      setItems([]);
+      setItemsError(error.message || 'Unable to load donations.');
+      throw error;
     } finally {
       setLoadingItems(false);
     }
-  }, [isConfigured]);
+  }, [configured]);
 
   useEffect(() => {
-    fetchItems();
+    fetchItems().catch((error) => console.error('Loading donations failed:', error));
   }, [fetchItems]);
 
-  // --------------------------------------------------------------------------
-  // 2. IMAGE UPLOAD HELPER (SUPABASE STORAGE)
-  // --------------------------------------------------------------------------
   const uploadItemImage = async (file) => {
-    if (!isConfigured || !user || !file) return null;
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-
-      const { data, error } = await supabase.storage
-        .from('donation-images')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) {
-        console.warn('Storage upload error:', error.message);
-        return null;
-      }
-
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('donation-images')
-        .getPublicUrl(fileName);
-
-      return publicUrlData?.publicUrl || null;
-    } catch (err) {
-      console.error('Image upload failed:', err);
-      return null;
+    requireSupabase(configured);
+    if (!user) throw new Error('Sign in before uploading an item photo.');
+    if (!file) return null;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      throw new Error('Choose a JPG, PNG, or WebP image.');
     }
+    if (file.size > 5 * 1024 * 1024) throw new Error('Image must be 5MB or smaller.');
+
+    const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
+    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+    const { error } = await supabase.storage.from('donation-images').upload(path, file, {
+      cacheControl: '3600',
+      contentType: file.type,
+      upsert: false
+    });
+    if (error) throw error;
+    const { data } = supabase.storage.from('donation-images').getPublicUrl(path);
+    return data.publicUrl;
   };
 
-  // --------------------------------------------------------------------------
-  // 3. CREATE DONATION
-  // --------------------------------------------------------------------------
   const createDonation = async (formData, imageFile = null) => {
-    if (!user && isConfigured) {
-      throw new Error('You must be logged in to donate an item.');
+    requireSupabase(configured);
+    if (!user) throw new Error('You must be logged in to donate an item.');
+    const title = formData.title?.trim() || '';
+    const description = formData.description?.trim() || '';
+    const category = formData.category;
+    const subcategory = category === 'College Essentials' ? formData.subcategory : 'General';
+    if (title.length < 3 || title.length > 120) throw new Error('Title must be between 3 and 120 characters.');
+    if (description.length < 10 || description.length > 3000) throw new Error('Description must be between 10 and 3000 characters.');
+    if (!CATEGORIES.includes(category)) throw new Error('Choose a valid donation category.');
+    if (category === 'College Essentials' && !COLLEGE_SUBCATEGORIES.includes(subcategory)) {
+      throw new Error('Choose a valid College Essentials subcategory.');
     }
+    if (!CONDITIONS.includes(formData.condition)) throw new Error('Choose a valid item condition.');
+    if ((formData.location?.trim() || '').length < 2) throw new Error('Pickup location must be at least 2 characters.');
 
-    let finalImageUrl = formData.imageUrl?.trim() || DEFAULT_FALLBACK_IMAGE;
-
-    // Handle optional file upload to Supabase Storage
-    if (imageFile && isConfigured) {
-      const uploadedUrl = await uploadItemImage(imageFile);
-      if (uploadedUrl) {
-        finalImageUrl = uploadedUrl;
-      }
-    }
-
-    if (isConfigured && user) {
-      const newDonationRow = {
+    const imageUrl = imageFile ? await uploadItemImage(imageFile) : formData.imageUrl?.trim() || null;
+    const tags = typeof formData.tags === 'string'
+      ? formData.tags.split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 20)
+      : [];
+    const { data, error } = await supabase
+      .from('donations')
+      .insert({
         donor_id: user.id,
-        title: formData.title.trim(),
-        description: formData.description.trim(),
-        category: formData.category,
-        subcategory: formData.category === 'College Essentials' ? formData.subcategory : 'General',
+        title,
+        description,
+        category,
+        subcategory,
         condition: formData.condition,
         location: formData.location.trim(),
         status: 'Available',
-        image_url: finalImageUrl,
+        image_url: imageUrl,
         pickup_times: formData.pickupTimes?.trim() || 'Flexible on campus',
-        tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [formData.category]
-      };
-
-      const { data, error } = await supabase
-        .from('donations')
-        .insert(newDonationRow)
-        .select(`
-          *,
-          profiles:donor_id (
-            id,
-            full_name,
-            campus_role,
-            department
-          )
-        `)
-        .single();
-
-      if (error) throw error;
-
-      await fetchItems();
-      showToast(`"${formData.title}" published successfully to campus catalog!`, 'success');
-      return data;
-    } else {
-      // In-memory demo fallback if Supabase is unconfigured
-      const demoItem = {
-        id: `demo-${Date.now()}`,
-        title: formData.title,
-        category: formData.category,
-        subcategory: formData.category === 'College Essentials' ? formData.subcategory : 'General',
-        condition: formData.condition,
-        location: formData.location,
-        status: 'Available',
-        donorName: formData.donorName || 'Student Contributor',
-        donorRole: formData.donorRole || 'Campus Member',
-        postedDate: 'Just now',
-        description: formData.description,
-        imageUrl: finalImageUrl,
-        tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()).filter(Boolean) : [formData.category],
-        pickupTimes: formData.pickupTimes || 'Flexible on campus'
-      };
-      setItems((prev) => [demoItem, ...prev]);
-      showToast(`"${demoItem.title}" saved to local session state!`, 'success');
-      return demoItem;
-    }
+        tags: tags.length ? tags : [category]
+      })
+      .select('*, donor:profiles!donations_donor_id_fkey(id, full_name, campus_role, department)')
+      .single();
+    if (error) throw error;
+    await fetchItems();
+    showToast(`"${title}" published to the campus catalog.`, 'success');
+    return presentDonation(data);
   };
 
-  // --------------------------------------------------------------------------
-  // 4. REQUEST AN ITEM (With self-request & duplicate prevention)
-  // --------------------------------------------------------------------------
   const requestItem = async (donationId, message = '') => {
-    if (!isConfigured) {
-      // Toggle demo reserved in fallback mode
-      setItems((prev) =>
-        prev.map((item) => {
-          if (item.id === donationId) {
-            const nextStatus = item.status === 'Available' ? 'Reserved' : 'Available';
-            return { ...item, status: nextStatus };
-          }
-          return item;
-        })
-      );
-      showToast('Demo request simulated! Item status updated.', 'info');
-      return { success: true };
-    }
-
-    if (!user) {
-      throw new Error('Please log in with your college account to request items.');
-    }
-
-    // Find the item to check donor identity
-    const targetItem = items.find((i) => i.id === donationId);
-    if (targetItem && targetItem.donorId === user.id) {
-      throw new Error('Self-request prohibited: You cannot request your own donation.');
-    }
-
-    if (targetItem && targetItem.status !== 'Available') {
-      throw new Error('This item is currently not available for requests.');
-    }
-
-    // Check if user already has an active pending or accepted request
-    const { data: existingRequests, error: checkError } = await supabase
-      .from('item_requests')
-      .select('id, status')
-      .eq('donation_id', donationId)
-      .eq('requester_id', user.id)
-      .in('status', ['Pending', 'Accepted']);
-
-    if (checkError) {
-      console.warn('Check request notice:', checkError.message);
-    }
-
-    if (existingRequests && existingRequests.length > 0) {
-      throw new Error('You already have an active request for this item.');
-    }
-
-    // Insert new request
+    requireSupabase(configured);
+    if (!user) throw new Error('Please log in to request this item.');
     const { data, error } = await supabase
       .from('item_requests')
       .insert({
@@ -265,196 +182,144 @@ export function ItemsProvider({ children }) {
       })
       .select()
       .single();
-
     if (error) {
-      if (error.message.includes('Self-request prohibited')) {
-        throw new Error('You cannot request your own donation.');
-      }
-      if (error.message.includes('unique_active_request')) {
-        throw new Error('You already have an active request for this item.');
-      }
+      if (error.code === '23505') throw new Error('You already have an active request for this item.');
+      if (error.message.includes('own donation')) throw new Error('You cannot request your own donation.');
+      if (error.message.includes('not available')) throw new Error('This item is no longer available.');
       throw error;
     }
-
-    showToast('Request sent to the donor! Check "My Requests" for updates.', 'success');
+    showToast('Request sent to the donor. Check My Requests for updates.', 'success');
     return data;
   };
 
-  // --------------------------------------------------------------------------
-  // 5. FETCH USER'S DONATIONS & INCOMING REQUESTS
-  // --------------------------------------------------------------------------
   const fetchMyDonations = async () => {
-    if (!isConfigured || !user) return [];
-
+    requireSupabase(configured);
+    if (!user) throw new Error('Sign in to view your donations.');
     const { data, error } = await supabase
       .from('donations')
       .select(`
         *,
         item_requests (
-          id,
-          status,
-          message,
-          created_at,
-          profiles:requester_id (
-            id,
-            full_name,
-            campus_role,
-            department,
-            email,
-            phone
-          )
+          id, status, message, created_at,
+          requester:profiles!item_requests_requester_id_fkey(id, full_name, campus_role, department)
         )
       `)
       .eq('donor_id', user.id)
       .order('created_at', { ascending: false });
-
     if (error) throw error;
-    return data || [];
+
+    const donations = data || [];
+    const acceptedIds = donations.flatMap((donation) =>
+      (donation.item_requests || []).filter((request) => request.status === 'Accepted').map((request) => request.id)
+    );
+    const contacts = await Promise.all(acceptedIds.map(async (requestId) => {
+      const { data: contact, error: contactError } = await supabase.rpc('get_accepted_request_contact', {
+        p_request_id: requestId
+      });
+      if (contactError) throw contactError;
+      return [requestId, contact];
+    }));
+    const contactByRequest = new Map(contacts);
+    return donations.map((donation) => ({
+      ...donation,
+      item_requests: (donation.item_requests || []).map((request) => ({
+        ...request,
+        profiles: {
+          ...request.requester,
+          ...(contactByRequest.get(request.id)?.requester || {})
+        }
+      }))
+    }));
   };
 
-  // --------------------------------------------------------------------------
-  // 6. FETCH USER'S REQUESTS
-  // --------------------------------------------------------------------------
   const fetchMyRequests = async () => {
-    if (!isConfigured || !user) return [];
-
+    requireSupabase(configured);
+    if (!user) throw new Error('Sign in to view your requests.');
     const { data, error } = await supabase
       .from('item_requests')
       .select(`
         *,
-        donations:donation_id (
-          id,
-          title,
-          category,
-          subcategory,
-          condition,
-          location,
-          status,
-          image_url,
-          pickup_times,
-          profiles:donor_id (
-            id,
-            full_name,
-            campus_role,
-            department,
-            email,
-            phone
-          )
+        donation:donations!item_requests_donation_id_fkey (
+          id, donor_id, title, category, subcategory, condition, location, status, image_url, pickup_times,
+          donor:profiles!donations_donor_id_fkey(id, full_name, campus_role, department)
         )
       `)
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false });
-
     if (error) throw error;
-    return data || [];
+
+    return Promise.all((data || []).map(async (request) => {
+      if (request.status !== 'Accepted') return { ...request, donations: request.donation };
+      const { data: contact, error: contactError } = await supabase.rpc('get_accepted_request_contact', {
+        p_request_id: request.id
+      });
+      if (contactError) throw contactError;
+      return {
+        ...request,
+        donations: {
+          ...request.donation,
+          profiles: {
+            ...request.donation?.donor,
+            ...(contact?.donor || {})
+          }
+        }
+      };
+    }));
   };
 
-  // --------------------------------------------------------------------------
-  // 7. ACCEPT REQUEST (Calls Atomic Postgres RPC)
-  // --------------------------------------------------------------------------
-  const acceptRequest = async (requestId) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase.rpc('accept_item_request', {
-      p_request_id: requestId
-    });
-
-    if (error) throw error;
-
-    if (data && !data.success) {
-      throw new Error(data.error || 'Failed to accept request');
-    }
-
+  const runRequestAction = async (functionName, args, successMessage, type = 'success') => {
+    requireSupabase(configured);
+    if (!user) throw new Error('Your session has expired. Please sign in again.');
+    const { data, error } = await supabase.rpc(functionName, args);
+    throwRpcError(data, error);
     await fetchItems();
-    showToast('Request accepted! The item is now marked as Reserved.', 'success');
+    showToast(successMessage, type);
     return data;
   };
 
-  // --------------------------------------------------------------------------
-  // 8. DECLINE REQUEST
-  // --------------------------------------------------------------------------
-  const declineRequest = async (requestId) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
+  const acceptRequest = (requestId) => runRequestAction(
+    'accept_item_request',
+    { p_request_id: requestId },
+    'Request accepted. The item is now reserved.'
+  );
+  const declineRequest = (requestId) => runRequestAction(
+    'decline_item_request',
+    { p_request_id: requestId },
+    'Request declined.',
+    'info'
+  );
+  const cancelMyRequest = (requestId) => runRequestAction(
+    'cancel_my_item_request',
+    { p_request_id: requestId },
+    'Your request has been cancelled.',
+    'info'
+  );
+  const markDonationCompleted = (donationId) => runRequestAction(
+    'mark_donation_completed',
+    { p_donation_id: donationId },
+    'Donation marked completed. Thank you for sharing.'
+  );
 
-    const { data, error } = await supabase.rpc('decline_item_request', {
-      p_request_id: requestId
-    });
-
-    if (error) throw error;
-    showToast('Request declined.', 'info');
-    return data;
-  };
-
-  // --------------------------------------------------------------------------
-  // 9. CANCEL MY REQUEST
-  // --------------------------------------------------------------------------
-  const cancelMyRequest = async (requestId) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase.rpc('cancel_my_item_request', {
-      p_request_id: requestId
-    });
-
-    if (error) throw error;
-    await fetchItems();
-    showToast('Your request has been cancelled.', 'info');
-    return data;
-  };
-
-  // --------------------------------------------------------------------------
-  // 10. MARK DONATION COMPLETED (Handover Done)
-  // --------------------------------------------------------------------------
-  const markDonationCompleted = async (donationId) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase.rpc('mark_donation_completed', {
-      p_donation_id: donationId
-    });
-
-    if (error) throw error;
-    await fetchItems();
-    showToast('Donation marked as Completed! Thank you for sharing.', 'success');
-    return data;
-  };
-
-  // --------------------------------------------------------------------------
-  // 11. DELETE DONATION
-  // --------------------------------------------------------------------------
   const deleteDonation = async (donationId) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
-
-    const { error } = await supabase
+    requireSupabase(configured);
+    if (!user) throw new Error('Your session has expired. Please sign in again.');
+    const { data, error } = await supabase
       .from('donations')
       .delete()
       .eq('id', donationId)
-      .eq('donor_id', user.id);
-
+      .eq('donor_id', user.id)
+      .select('id')
+      .maybeSingle();
     if (error) throw error;
+    if (!data) throw new Error('Donation not found or you are not allowed to delete it.');
     await fetchItems();
     showToast('Donation listing deleted.', 'info');
   };
 
-  // Helper time formatter
-  function formatTimeAgo(timestamp) {
-    if (!timestamp) return 'Recently';
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 5) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  }
-
   const value = {
     items,
     loadingItems,
+    itemsError,
     fetchItems,
     createDonation,
     requestItem,
@@ -471,7 +336,7 @@ export function ItemsProvider({ children }) {
     toast,
     showToast,
     hideToast,
-    isConfigured
+    isConfigured: configured
   };
 
   return <ItemsContext.Provider value={value}>{children}</ItemsContext.Provider>;
@@ -479,8 +344,6 @@ export function ItemsProvider({ children }) {
 
 export function useItems() {
   const context = useContext(ItemsContext);
-  if (!context) {
-    throw new Error('useItems must be used within an ItemsProvider');
-  }
+  if (!context) throw new Error('useItems must be used within an ItemsProvider');
   return context;
 }

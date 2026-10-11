@@ -208,10 +208,10 @@ export default function HowItWorksPage() {
 
           <div style={{ background: '#ffffff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '20px 24px' }}>
             <h4 style={{ margin: '0 0 8px', fontSize: '1.05rem', color: 'var(--color-heading)' }}>
-              How does the Phase 1 prototype handle my newly added items?
+              How are my listings and requests stored?
             </h4>
             <p style={{ margin: 0, fontSize: '0.92rem', color: 'var(--color-text-body)', lineHeight: 1.6 }}>
-              In this initial Phase 1 build, listings are stored in your active React state so you can test adding, searching, and filtering items immediately without a backend server. Full database persistence will be added in Phase 2.
+              Listings and requests are stored in the project database and protected by account-based access policies. You can manage your own listings, and only the owner of an item can accept or decline its requests.
             </p>
           </div>
         </div>

@@ -1,95 +1,82 @@
-// src/context/AuthContext.jsx
-// Manages real Supabase Authentication, Session Lifecycle, and User Profiles
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const AuthContext = createContext(null);
+const CONFIG_ERROR = 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) to .env, then restart Vite.';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState(null);
   const isConfigured = isSupabaseConfigured();
 
-  // Load profile from public.profiles
-  const fetchProfile = useCallback(async (userId) => {
-    if (!isConfigured || !userId) {
+  const fetchProfile = useCallback(async (currentUser) => {
+    if (!currentUser || !isConfigured) {
       setProfile(null);
-      return;
+      return null;
     }
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
 
-      if (error) {
-        console.warn('Profile fetch notice:', error.message);
-        // Fallback profile if row is not created yet
-        setProfile({
-          id: userId,
-          full_name: user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Campus Contributor',
-          campus_role: user?.user_metadata?.campus_role || 'Engineering Student',
-          department: user?.user_metadata?.department || 'Engineering',
-          email: user?.email
-        });
-      } else {
-        setProfile(data);
-      }
-    } catch (err) {
-      console.error('Error fetching profile:', err);
+    const { data, error } = await supabase.rpc('get_my_profile');
+    if (error) {
+      setProfileError(error.message);
+      throw error;
     }
-  }, [isConfigured, user]);
+    setProfileError(null);
+    setProfile(data || null);
+    return data;
+  }, [isConfigured]);
 
   useEffect(() => {
     if (!isConfigured) {
       setLoading(false);
-      return;
+      return undefined;
     }
 
-    // 1. Check existing session on mount
-    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
-      if (error) {
-        console.warn('Session check notice:', error.message);
-      }
-      setSession(initialSession);
-      setUser(initialSession?.user ?? null);
-      if (initialSession?.user) {
-        fetchProfile(initialSession.user.id);
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      if (!currentSession?.user || event === 'SIGNED_OUT') {
+        setProfile(null);
+        setProfileError(null);
+      } else if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED', 'INITIAL_SESSION'].includes(event)) {
+        setTimeout(() => {
+          if (active) fetchProfile(currentSession.user).catch((error) => {
+            console.error('Loading profile failed:', error);
+          });
+        }, 0);
       }
       setLoading(false);
     });
 
-    // 2. Listen to real-time auth changes (sign in, sign out, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+    supabase.auth.getSession().then(({ data: { session: currentSession }, error }) => {
+      if (!active) return;
+      if (error) console.error('Checking the Supabase session failed:', error);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
-
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-        if (currentSession?.user) {
-          await fetchProfile(currentSession.user.id);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setProfile(null);
-        setUser(null);
-        setSession(null);
-      }
       setLoading(false);
+      if (currentSession?.user) {
+        fetchProfile(currentSession.user).catch((profileFetchError) => {
+          console.error('Loading profile failed:', profileFetchError);
+        });
+      }
+    }).catch((error) => {
+      if (active) {
+        setProfileError(error.message || 'Unable to check the current session.');
+        setLoading(false);
+      }
     });
 
     return () => {
-      subscription?.unsubscribe();
+      active = false;
+      subscription.unsubscribe();
     };
-  }, [isConfigured, fetchProfile]);
+  }, [fetchProfile, isConfigured]);
 
-  // Sign Up with Email, Password & Profile metadata
   const signUp = async ({ email, password, fullName, campusRole, department, phone }) => {
-    if (!isConfigured) {
-      throw new Error('Supabase is not configured yet. Please configure your .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
-    }
-
+    if (!isConfigured) throw new Error(CONFIG_ERROR);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -102,73 +89,70 @@ export function AuthProvider({ children }) {
         }
       }
     });
-
     if (error) throw error;
     return data;
   };
 
-  // Sign In with Email & Password
   const signIn = async ({ email, password }) => {
-    if (!isConfigured) {
-      throw new Error('Supabase is not configured yet. Please configure your .env file with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
-    }
+    if (!isConfigured) throw new Error(CONFIG_ERROR);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  };
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+  const requestPasswordReset = async (email) => {
+    if (!isConfigured) throw new Error(CONFIG_ERROR);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`
     });
-
     if (error) throw error;
-    return data;
   };
 
-  // Sign Out
+  const updatePassword = async (password) => {
+    if (!isConfigured) throw new Error(CONFIG_ERROR);
+    const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (!currentSession) throw new Error('This password-reset link is invalid or expired. Request a new link.');
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+  };
+
   const signOut = async () => {
-    if (!isConfigured) {
-      setUser(null);
-      setProfile(null);
-      setSession(null);
-      return;
-    }
+    if (!isConfigured) throw new Error(CONFIG_ERROR);
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.warn('Sign out notice:', error.message);
-    }
-    setUser(null);
-    setProfile(null);
-    setSession(null);
+    if (error) throw error;
   };
 
-  // Update Profile
   const updateProfile = async (updates) => {
-    if (!isConfigured || !user) throw new Error('Not authenticated');
-
-    const { data, error } = await supabase
+    if (!isConfigured || !user) throw new Error('You must be signed in to update your profile.');
+    const allowedUpdates = {
+      full_name: updates.full_name?.trim(),
+      campus_role: updates.campus_role,
+      department: updates.department?.trim(),
+      phone: updates.phone?.trim() || null
+    };
+    const { error } = await supabase
       .from('profiles')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id)
-      .select()
-      .single();
-
+      .update(allowedUpdates)
+      .eq('id', user.id);
     if (error) throw error;
-    setProfile(data);
-    return data;
+    return fetchProfile(user);
   };
 
   const value = {
     user,
     profile,
+    profileError,
     session,
     loading,
     isConfigured,
     signUp,
     signIn,
+    requestPasswordReset,
+    updatePassword,
     signOut,
     updateProfile,
-    refreshProfile: () => user && fetchProfile(user.id)
+    refreshProfile: () => fetchProfile(user)
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -176,8 +160,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 }

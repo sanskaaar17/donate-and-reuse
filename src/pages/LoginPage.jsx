@@ -2,7 +2,7 @@
 // Real Supabase Email/Password Authentication & Session Creation
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle2, Loader2, KeyRound } from 'lucide-react';
+import { Eye, EyeOff, Mail, AlertCircle, Loader2, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useItems } from '../context/ItemsContext';
 
@@ -12,9 +12,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [authError, setAuthError] = useState(null);
+  const [resetNotice, setResetNotice] = useState(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const { signIn, isConfigured } = useAuth();
+  const { signIn, requestPasswordReset, isConfigured } = useAuth();
   const { showToast } = useItems();
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,6 +60,25 @@ export default function LoginPage() {
     }
   };
 
+  const handlePasswordReset = async () => {
+    setAuthError(null);
+    setResetNotice(null);
+    if (!/\S+@\S+\.\S+/.test(email.trim())) {
+      setErrors((previous) => ({ ...previous, email: 'Enter your account email first.' }));
+      return;
+    }
+    setResetSubmitting(true);
+    try {
+      await requestPasswordReset(email.trim());
+      setResetNotice('If an account exists for that email, Supabase has sent a password-reset link. Check your inbox and spam folder.');
+    } catch (error) {
+      console.error('Password reset request failed:', error);
+      setAuthError(error.message || 'Could not send the password-reset email.');
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
   return (
     <div className="auth-page-wrapper">
       <div className="auth-card">
@@ -85,7 +106,7 @@ export default function LoginPage() {
               lineHeight: 1.5
             }}
           >
-            <strong>Setup Notice:</strong> To connect your real database, copy your project URL &amp; anon key into the <code>.env</code> file.
+            <strong>Setup Notice:</strong> To connect your real database, copy your project URL &amp; publishable (or anon) key into the <code>.env</code> file.
           </div>
         )}
 
@@ -107,6 +128,11 @@ export default function LoginPage() {
           >
             <AlertCircle size={18} style={{ flexShrink: 0 }} />
             <span>{authError}</span>
+          </div>
+        )}
+        {resetNotice && (
+          <div role="status" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-md)', padding: '12px 16px', marginBottom: '20px', fontSize: '0.85rem', color: '#065f46' }}>
+            {resetNotice}
           </div>
         )}
 
@@ -137,9 +163,19 @@ export default function LoginPage() {
 
           {/* Password */}
           <div className="form-group">
-            <label className="form-label" htmlFor="login-password">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <label className="form-label" htmlFor="login-password">
               Password <span className="required-star">*</span>
-            </label>
+              </label>
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                disabled={resetSubmitting}
+                style={{ border: 0, padding: 0, background: 'transparent', color: 'var(--color-primary)', fontWeight: 700, fontSize: '0.82rem', cursor: resetSubmitting ? 'wait' : 'pointer' }}
+              >
+                {resetSubmitting ? 'Sending link...' : 'Forgot password?'}
+              </button>
+            </div>
             <div className="password-toggle-wrapper">
               <input
                 type={showPassword ? 'text' : 'password'}

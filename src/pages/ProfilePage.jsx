@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useItems } from '../context/ItemsContext';
 
 export default function ProfilePage() {
-  const { user, profile, updateProfile, signOut } = useAuth();
+  const { user, profile, profileError, updateProfile, signOut } = useAuth();
   const { showToast } = useItems();
   const navigate = useNavigate();
 
@@ -32,6 +32,7 @@ export default function ProfilePage() {
   });
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [pageError, setPageError] = useState(null);
 
   useEffect(() => {
     if (profile) {
@@ -60,6 +61,7 @@ export default function ProfilePage() {
 
     setSaving(true);
     setSuccessMsg(false);
+    setPageError(null);
     try {
       await updateProfile({
         full_name: formData.fullName.trim(),
@@ -70,7 +72,7 @@ export default function ProfilePage() {
       setSuccessMsg(true);
       showToast('Profile updated successfully!', 'success');
     } catch (err) {
-      alert(err.message || 'Failed to update profile');
+      setPageError(err.message || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
@@ -78,9 +80,13 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => {
     if (window.confirm('Are you sure you want to log out?')) {
-      await signOut();
-      showToast('Logged out successfully.', 'info');
-      navigate('/');
+      try {
+        await signOut();
+        showToast('Logged out successfully.', 'info');
+        navigate('/');
+      } catch (error) {
+        setPageError(error.message || 'Unable to sign out. Please try again.');
+      }
     }
   };
 
@@ -159,6 +165,16 @@ export default function ProfilePage() {
 
       {/* Edit Form */}
       <div className="form-card">
+        {profileError && (
+          <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
+            Profile could not be loaded from Supabase: {profileError}
+          </div>
+        )}
+        {pageError && (
+          <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: '12px 16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
+            {pageError}
+          </div>
+        )}
         {successMsg && (
           <div
             style={{

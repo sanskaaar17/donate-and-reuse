@@ -31,9 +31,14 @@ export default function Navbar() {
 
   const handleSignOut = async () => {
     closeMobileMenu();
-    await signOut();
-    showToast('You have been logged out.', 'info');
-    navigate('/');
+    try {
+      await signOut();
+      showToast('You have been logged out.', 'info');
+      navigate('/');
+    } catch (error) {
+      console.error('Sign out failed:', error);
+      showToast(error.message || 'Unable to sign out. Please try again.', 'error');
+    }
   };
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'My Account';

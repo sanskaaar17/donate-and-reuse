@@ -1,0 +1,14 @@
+warning: in the working copy of '.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/Footer.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/Navbar.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/lib/supabase.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/CollegeEssentialsPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/DonatePage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/ExplorePage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/HomePage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/HowItWorksPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/LoginPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/MyDonationsPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/MyRequestsPage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/ProfilePage.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/RegisterPage.jsx', LF will be replaced by CRLF the next time Git touches it

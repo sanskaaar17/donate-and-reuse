@@ -29,11 +29,13 @@ export default function MyDonationsPage() {
   const { user, profile } = useAuth();
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
   const [expandedDonationId, setExpandedDonationId] = useState(null);
 
   const loadDonations = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const data = await fetchMyDonations();
       setDonations(data);
@@ -44,6 +46,7 @@ export default function MyDonationsPage() {
       }
     } catch (err) {
       console.error('Failed to load donations:', err);
+      setLoadError(err.message || 'Unable to load your donations.');
     } finally {
       setLoading(false);
     }
@@ -131,6 +134,11 @@ export default function MyDonationsPage() {
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-primary)' }}>
           <Loader2 size={36} className="spin-animation" style={{ margin: '0 auto 12px' }} />
           <p style={{ color: 'var(--color-text-muted)' }}>Loading your donation listings...</p>
+        </div>
+      ) : loadError ? (
+        <div className="demo-banner-box" role="alert">
+          <span>{loadError}</span>
+          <button type="button" className="btn btn-sm btn-outline" onClick={loadDonations}>Retry</button>
         </div>
       ) : donations.length === 0 ? (
         <EmptyState

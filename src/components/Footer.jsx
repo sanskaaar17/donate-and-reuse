@@ -23,7 +23,7 @@ export default function Footer() {
             to help students and community members exchange usable items for free and eliminate campus waste.
           </p>
           <div className="footer-badge-demo">
-            <Sparkles size={13} /> Phase 1 Frontend Prototype • Demo Mode
+            <Sparkles size={13} /> Supabase-powered campus exchange
           </div>
         </div>
 
@@ -70,7 +70,7 @@ export default function Footer() {
         <div className="footer-bottom-links">
           <Link to="/how-it-works">Safety Guidelines</Link>
           <Link to="/how-it-works">Handover Ethics</Link>
-          <Link to="/login">UI Preview</Link>
+          <Link to="/login">Account Login</Link>
         </div>
       </div>
     </footer>

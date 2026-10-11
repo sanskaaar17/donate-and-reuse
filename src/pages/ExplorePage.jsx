@@ -1,14 +1,14 @@
 // src/pages/ExplorePage.jsx
 import React, { useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { PlusCircle, Search, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { PlusCircle, Loader2, RefreshCw } from 'lucide-react';
 import DonationCard from '../components/DonationCard';
 import SearchAndFilters from '../components/SearchAndFilters';
 import EmptyState from '../components/EmptyState';
 import { useItems } from '../context/ItemsContext';
 
 export default function ExplorePage() {
-  const { items } = useItems();
+  const { items, loadingItems, itemsError, fetchItems } = useItems();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Search and filter states initialized from query parameters if present
@@ -77,14 +77,6 @@ export default function ExplorePage() {
         </Link>
       </div>
 
-      {/* Demo Notice Banner */}
-      <div className="demo-banner-box">
-        <Sparkles size={18} color="#16a34a" style={{ flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <strong>Phase 1 Frontend Prototype:</strong> Showing realistic simulated items. You can test searching, filtering, and clicking any item to view its details or simulate reserving it.
-        </div>
-      </div>
-
       {/* Search & Filters */}
       <SearchAndFilters
         searchTerm={searchTerm}
@@ -99,8 +91,24 @@ export default function ExplorePage() {
         totalResults={filteredItems.length}
       />
 
+      {itemsError && (
+        <div className="demo-banner-box" role="alert" style={{ marginBottom: '24px' }}>
+          <span>{itemsError}</span>
+          {itemsError.includes('Configure Supabase') ? null : (
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => fetchItems().catch((error) => console.error('Retrying donations failed:', error))}>
+              <RefreshCw size={15} /> Retry
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Item Grid or Empty State */}
-      {filteredItems.length > 0 ? (
+      {loadingItems ? (
+        <div role="status" style={{ textAlign: 'center', padding: '48px', color: 'var(--color-text-muted)' }}>
+          <Loader2 size={30} className="spin-animation" style={{ margin: '0 auto 10px' }} />
+          <div>Loading campus donations...</div>
+        </div>
+      ) : filteredItems.length > 0 ? (
         <div className="donation-grid">
           {filteredItems.map((item) => (
             <DonationCard key={item.id} item={item} />

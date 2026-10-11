@@ -119,7 +119,7 @@ export default function RegisterPage() {
               lineHeight: 1.5
             }}
           >
-            <strong>Setup Notice:</strong> To connect your real database, configure <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in <code>.env</code>.
+            <strong>Setup Notice:</strong> To connect your real database, configure <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> (or <code>VITE_SUPABASE_ANON_KEY</code>) in <code>.env</code>.
           </div>
         )}
 

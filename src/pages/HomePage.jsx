@@ -9,7 +9,7 @@ import { useItems } from '../context/ItemsContext';
 import { HOW_IT_WORKS_STEPS, CEP_PRINCIPLES } from '../data/demoData';
 
 export default function HomePage() {
-  const { items } = useItems();
+  const { items, loadingItems, itemsError } = useItems();
 
   // Show top 6 items for featured donations
   const featuredDonations = items.slice(0, 6);
@@ -54,11 +54,17 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="donation-grid">
-          {featuredDonations.map((item) => (
-            <DonationCard key={item.id} item={item} />
-          ))}
-        </div>
+        {loadingItems ? (
+          <p role="status" className="section-subtext">Loading recent donations...</p>
+        ) : featuredDonations.length ? (
+          <div className="donation-grid">
+            {featuredDonations.map((item) => <DonationCard key={item.id} item={item} />)}
+          </div>
+        ) : (
+          <p role={itemsError ? 'alert' : 'status'} className="section-subtext">
+            {itemsError || 'No donations have been listed yet. Be the first to share an item.'}
+          </p>
+        )}
       </section>
 
       {/* 4. Three-Step "How It Works" Walkthrough */}
