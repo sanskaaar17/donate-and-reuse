@@ -12,7 +12,10 @@ envContent.split('\n').forEach(line => {
   }
 });
 
-const supabase = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY);
+const supabase = createClient(
+  env.VITE_SUPABASE_URL,
+  env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY
+);
 
 async function testBucket() {
   const { data, error } = await supabase.storage.getBucket('donation-images');

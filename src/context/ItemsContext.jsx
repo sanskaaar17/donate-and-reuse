@@ -115,7 +115,12 @@ export function ItemsProvider({ children }) {
     if (file.size > 5 * 1024 * 1024) throw new Error('Image must be 5MB or smaller.');
 
     const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1];
-    const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
+    // crypto.randomUUID() is not available on some older Android WebViews (< Chrome 92)
+    const uuid = typeof crypto?.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    const path = `${user.id}/${uuid}.${extension}`;
+
     const { error } = await supabase.storage.from('donation-images').upload(path, file, {
       cacheControl: '3600',
       contentType: file.type,

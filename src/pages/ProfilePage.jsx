@@ -55,7 +55,11 @@ export default function ProfilePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.fullName.trim()) {
-      alert('Full name is required');
+      setPageError('Full name is required.');
+      return;
+    }
+    if (formData.fullName.trim().length < 2) {
+      setPageError('Name must be at least 2 characters.');
       return;
     }
 
@@ -77,6 +81,7 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
+
 
   const handleSignOut = async () => {
     if (window.confirm('Are you sure you want to log out?')) {

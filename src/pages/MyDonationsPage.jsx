@@ -1,6 +1,6 @@
 // src/pages/MyDonationsPage.jsx
 // Manage user's donations, view incoming requests, and accept/decline requests
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Package,
@@ -15,10 +15,10 @@ import {
   ChevronDown,
   ChevronUp,
   MapPin,
-  Sparkles,
   Phone,
   Mail,
-  Loader2
+  Loader2,
+  TriangleAlert
 } from 'lucide-react';
 import { useItems } from '../context/ItemsContext';
 import { useAuth } from '../context/AuthContext';
@@ -32,14 +32,17 @@ export default function MyDonationsPage() {
   const [loadError, setLoadError] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
   const [expandedDonationId, setExpandedDonationId] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  // Inline confirm state: { type: 'accept'|'decline'|'complete'|'delete', id, donationTitle?, requestId? }
+  const [pendingConfirm, setPendingConfirm] = useState(null);
 
-  const loadDonations = async () => {
+  const loadDonations = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const data = await fetchMyDonations();
       setDonations(data);
-      // Auto-expand first donation that has pending requests
+      // Auto-expand first donation with pending requests
       const withPending = data.find((d) => d.item_requests?.some((r) => r.status === 'Pending'));
       if (withPending) {
         setExpandedDonationId(withPending.id);
@@ -50,64 +53,52 @@ export default function MyDonationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchMyDonations]);
 
+  // Stable user?.id prevents re-fetching on every token refresh
   useEffect(() => {
     loadDonations();
-  }, [user]);
+  }, [user?.id, loadDonations]);
 
-  const handleAccept = async (requestId, donationTitle) => {
-    if (!window.confirm(`Accept this request for "${donationTitle}"? Other pending requests will be declined and the item marked as Reserved.`)) {
-      return;
-    }
-    setActionInProgress(requestId);
+  const runAction = async (fn) => {
+    setActionError(null);
     try {
-      await acceptRequest(requestId);
+      await fn();
       await loadDonations();
     } catch (err) {
-      alert(err.message || 'Failed to accept request');
+      setActionError(err.message || 'Action failed. Please try again.');
     } finally {
       setActionInProgress(null);
+      setPendingConfirm(null);
     }
   };
 
-  const handleDecline = async (requestId) => {
-    if (!window.confirm('Decline this request?')) return;
-    setActionInProgress(requestId);
-    try {
-      await declineRequest(requestId);
-      await loadDonations();
-    } catch (err) {
-      alert(err.message || 'Failed to decline request');
-    } finally {
-      setActionInProgress(null);
+  const confirmAndRun = async () => {
+    if (!pendingConfirm) return;
+    const { type, id } = pendingConfirm;
+    setActionInProgress(id);
+    if (type === 'accept') {
+      await runAction(() => acceptRequest(id));
+    } else if (type === 'decline') {
+      await runAction(() => declineRequest(id));
+    } else if (type === 'complete') {
+      await runAction(() => markDonationCompleted(id));
+    } else if (type === 'delete') {
+      await runAction(() => deleteDonation(id));
     }
   };
 
-  const handleMarkCompleted = async (donationId) => {
-    if (!window.confirm('Confirm that the handover was completed successfully on campus?')) return;
-    setActionInProgress(donationId);
-    try {
-      await markDonationCompleted(donationId);
-      await loadDonations();
-    } catch (err) {
-      alert(err.message || 'Failed to mark as completed');
-    } finally {
-      setActionInProgress(null);
-    }
+  const handleAccept = (requestId, donationTitle) => {
+    setPendingConfirm({ type: 'accept', id: requestId, label: `Accept request for "${donationTitle}"? Other pending requests will be declined and the item marked Reserved.` });
   };
-
-  const handleDelete = async (donationId, title) => {
-    if (!window.confirm(`Delete listing "${title}"? This cannot be undone.`)) return;
-    setActionInProgress(donationId);
-    try {
-      await deleteDonation(donationId);
-      await loadDonations();
-    } catch (err) {
-      alert(err.message || 'Failed to delete donation');
-    } finally {
-      setActionInProgress(null);
-    }
+  const handleDecline = (requestId) => {
+    setPendingConfirm({ type: 'decline', id: requestId, label: 'Decline this request?' });
+  };
+  const handleMarkCompleted = (donationId) => {
+    setPendingConfirm({ type: 'complete', id: donationId, label: 'Confirm that the handover was completed on campus?' });
+  };
+  const handleDelete = (donationId, title) => {
+    setPendingConfirm({ type: 'delete', id: donationId, label: `Delete listing "${title}"? This cannot be undone.` });
   };
 
   const toggleExpand = (id) => {
@@ -130,6 +121,81 @@ export default function MyDonationsPage() {
         </Link>
       </div>
 
+      {/* Inline action error */}
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 16px',
+            marginBottom: '20px',
+            color: '#b91c1c',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem'
+          }}
+        >
+          <AlertCircle size={18} style={{ flexShrink: 0 }} />
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c' }}
+            aria-label="Dismiss error"
+          >
+            <XCircle size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Inline confirmation dialog */}
+      {pendingConfirm && (
+        <div
+          role="alertdialog"
+          aria-labelledby="confirm-action-title"
+          style={{
+            background: '#fffbeb',
+            border: '1.5px solid #fde68a',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px 24px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '16px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <TriangleAlert size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <strong id="confirm-action-title" style={{ display: 'block', color: '#92400e', marginBottom: '12px' }}>
+              {pendingConfirm.label}
+            </strong>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-accent"
+                disabled={!!actionInProgress}
+                onClick={confirmAndRun}
+              >
+                {actionInProgress ? <Loader2 size={14} className="spin-animation" /> : <Check size={14} />}
+                Confirm
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-subtle"
+                disabled={!!actionInProgress}
+                onClick={() => setPendingConfirm(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-primary)' }}>
           <Loader2 size={36} className="spin-animation" style={{ margin: '0 auto 12px' }} />
@@ -148,6 +214,7 @@ export default function MyDonationsPage() {
         />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
           {donations.map((item) => {
             const requests = item.item_requests || [];
             const pendingCount = requests.filter((r) => r.status === 'Pending').length;

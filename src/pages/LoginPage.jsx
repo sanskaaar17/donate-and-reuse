@@ -41,6 +41,23 @@ export default function LoginPage() {
     return Object.keys(errs).length === 0;
   };
 
+  const friendlyAuthError = (err) => {
+    const msg = err?.message?.toLowerCase() || '';
+    if (msg.includes('invalid login credentials') || msg.includes('invalid email or password')) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    if (msg.includes('email not confirmed')) {
+      return 'Please verify your email address first. Check your inbox for a confirmation link.';
+    }
+    if (msg.includes('too many requests') || msg.includes('rate limit')) {
+      return 'Too many sign-in attempts. Please wait a few minutes and try again.';
+    }
+    if (msg.includes('user not found')) {
+      return 'No account found with this email. Please register first.';
+    }
+    return err?.message || 'Failed to sign in. Please verify your credentials.';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setAuthError(null);
@@ -54,11 +71,12 @@ export default function LoginPage() {
       navigate(fromLocation, { replace: true });
     } catch (err) {
       console.error('Sign in error:', err);
-      setAuthError(err.message || 'Failed to sign in. Please verify your credentials.');
+      setAuthError(friendlyAuthError(err));
     } finally {
       setSubmitting(false);
     }
   };
+
 
   const handlePasswordReset = async () => {
     setAuthError(null);

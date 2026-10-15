@@ -1,6 +1,6 @@
 // src/pages/MyRequestsPage.jsx
 // View all donation items requested by the user and their acceptance status
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Inbox,
@@ -10,10 +10,10 @@ import {
   MapPin,
   Mail,
   Phone,
-  Calendar,
   AlertCircle,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  TriangleAlert
 } from 'lucide-react';
 import { useItems } from '../context/ItemsContext';
 import { useAuth } from '../context/AuthContext';
@@ -26,8 +26,10 @@ export default function MyRequestsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [confirmCancel, setConfirmCancel] = useState(null); // { id, title }
+  const [actionError, setActionError] = useState(null);
 
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
@@ -39,20 +41,24 @@ export default function MyRequestsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchMyRequests]);
 
+  // Use stable user?.id so this doesn't re-fire on every token refresh
   useEffect(() => {
     loadRequests();
-  }, [user]);
+  }, [user?.id, loadRequests]);
 
-  const handleCancel = async (requestId, itemTitle) => {
-    if (!window.confirm(`Cancel your request for "${itemTitle}"?`)) return;
-    setActionInProgress(requestId);
+  const handleCancel = async () => {
+    if (!confirmCancel) return;
+    const { id, title } = confirmCancel;
+    setConfirmCancel(null);
+    setActionError(null);
+    setActionInProgress(id);
     try {
-      await cancelMyRequest(requestId);
+      await cancelMyRequest(id);
       await loadRequests();
     } catch (err) {
-      alert(err.message || 'Failed to cancel request');
+      setActionError(err.message || 'Failed to cancel request. Please try again.');
     } finally {
       setActionInProgress(null);
     }
@@ -74,6 +80,82 @@ export default function MyRequestsPage() {
         </Link>
       </div>
 
+      {/* Inline action error */}
+      {actionError && (
+        <div
+          role="alert"
+          style={{
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 16px',
+            marginBottom: '20px',
+            color: '#b91c1c',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.9rem'
+          }}
+        >
+          <AlertCircle size={18} style={{ flexShrink: 0 }} />
+          <span>{actionError}</span>
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#b91c1c' }}
+            aria-label="Dismiss error"
+          >
+            <XCircle size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* Inline confirmation dialog */}
+      {confirmCancel && (
+        <div
+          role="alertdialog"
+          aria-labelledby="cancel-confirm-title"
+          style={{
+            background: '#fffbeb',
+            border: '1.5px solid #fde68a',
+            borderRadius: 'var(--radius-lg)',
+            padding: '20px 24px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '16px',
+            flexWrap: 'wrap'
+          }}
+        >
+          <TriangleAlert size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '2px' }} />
+          <div style={{ flex: 1 }}>
+            <strong id="cancel-confirm-title" style={{ display: 'block', color: '#92400e', marginBottom: '6px' }}>
+              Cancel your request for "{confirmCancel.title}"?
+            </strong>
+            <p style={{ margin: '0 0 14px', fontSize: '0.88rem', color: '#78350f' }}>
+              The item will become available again for other students to request.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                onClick={handleCancel}
+              >
+                <XCircle size={15} /> Yes, Cancel Request
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-subtle"
+                onClick={() => setConfirmCancel(null)}
+              >
+                Keep Request
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-primary)' }}>
           <Loader2 size={36} className="spin-animation" style={{ margin: '0 auto 12px' }} />
@@ -93,12 +175,12 @@ export default function MyRequestsPage() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {requests.map((req) => {
-            const item = req.donations || {};
+            // fetchMyRequests returns req.donation (singular) — fixed from previous req.donations bug
+            const item = req.donation || {};
             const donor = item.profiles || {};
             const isAccepted = req.status === 'Accepted';
             const isPending = req.status === 'Pending';
             const isDeclined = req.status === 'Declined';
-            const isCancelled = req.status === 'Cancelled';
 
             return (
               <div
@@ -116,7 +198,7 @@ export default function MyRequestsPage() {
                   <div style={{ display: 'flex', gap: '20px', flex: 1, minWidth: '280px' }}>
                     <img
                       src={item.image_url || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80'}
-                      alt={item.title || 'Donation item'}
+                      alt={item.title ? `Photo of ${item.title}` : 'Donation item'}
                       style={{ width: '88px', height: '88px', objectFit: 'cover', borderRadius: 'var(--radius-md)', flexShrink: 0 }}
                       onError={(e) => {
                         e.target.src = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80';
@@ -132,13 +214,15 @@ export default function MyRequestsPage() {
                       </div>
 
                       <h3 style={{ margin: '0 0 6px', fontSize: '1.25rem', color: 'var(--color-heading)' }}>
-                        {item.title}
+                        {item.title || 'Item details unavailable'}
                       </h3>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: 'var(--color-text-muted)', flexWrap: 'wrap' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <MapPin size={14} color="#0d9488" /> {item.location}
-                        </span>
+                        {item.location && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <MapPin size={14} color="#0d9488" /> {item.location}
+                          </span>
+                        )}
                         <span>Offered by {donor.full_name || 'Campus Peer'}</span>
                         <span>Requested on {new Date(req.created_at).toLocaleDateString()}</span>
                       </div>
@@ -149,16 +233,21 @@ export default function MyRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
+                  {/* Right: Cancel button for pending */}
                   {isPending && (
                     <button
                       type="button"
                       className="btn btn-sm btn-outline"
-                      style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                      style={{ color: '#ef4444', borderColor: '#fca5a5', flexShrink: 0 }}
                       disabled={actionInProgress === req.id}
-                      onClick={() => handleCancel(req.id, item.title)}
+                      onClick={() => setConfirmCancel({ id: req.id, title: item.title || 'this item' })}
+                      aria-busy={actionInProgress === req.id}
                     >
-                      <XCircle size={15} /> Cancel Request
+                      {actionInProgress === req.id
+                        ? <Loader2 size={15} className="spin-animation" />
+                        : <XCircle size={15} />
+                      }
+                      Cancel Request
                     </button>
                   )}
                 </div>
@@ -178,14 +267,16 @@ export default function MyRequestsPage() {
                       <CheckCircle2 size={18} color="#10b981" /> Request Accepted by Donor!
                     </div>
                     <p style={{ margin: '0 0 12px', fontSize: '0.88rem', color: '#166534', lineHeight: 1.5 }}>
-                      The donor has accepted your request. Please reach out using the verified contact details below to arrange a safe daytime handover on campus:
+                      Please reach out using the verified contact details below to arrange a safe daytime handover on campus:
                     </p>
 
                     <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', fontSize: '0.9rem', color: '#0f5132' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <MapPin size={16} color="#0d9488" />
-                        <strong>Pickup Point:</strong> {item.location}
-                      </div>
+                      {item.location && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={16} color="#0d9488" />
+                          <strong>Pickup Point:</strong> {item.location}
+                        </div>
+                      )}
                       {item.pickup_times && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Clock size={16} color="#0d9488" />
@@ -221,7 +312,7 @@ export default function MyRequestsPage() {
                       color: '#991b1b'
                     }}
                   >
-                    This request was declined (the item may have been accepted for another student). You can continue searching the catalog for other resources!
+                    This request was declined. The item may have been reserved for another student. You can continue searching the catalog for other resources!
                   </div>
                 )}
               </div>
@@ -232,3 +323,4 @@ export default function MyRequestsPage() {
     </div>
   );
 }
+

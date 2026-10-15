@@ -7,6 +7,7 @@ import Footer from './components/Footer';
 import ItemDetailModal from './components/ItemDetailModal';
 import Toast from './components/Toast';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import { AuthProvider } from './context/AuthContext';
 import { ItemsProvider } from './context/ItemsContext';
@@ -22,6 +23,8 @@ import MyDonationsPage from './pages/MyDonationsPage';
 import MyRequestsPage from './pages/MyRequestsPage';
 import ProfilePage from './pages/ProfilePage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import NotFoundPage from './pages/NotFoundPage';
+
 
 // Helper component that scrolls window to top on route change
 function ScrollToTop() {
@@ -36,71 +39,74 @@ function ScrollToTop() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ItemsProvider>
-        <Router>
-          <ScrollToTop />
-          <div className="outer-viewport">
-            <div className="app-canvas">
-              <Navbar />
-              <main className="main-content" id="main-content">
-                <Routes>
-                  {/* Public Browsing Routes */}
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/explore" element={<ExplorePage />} />
-                  <Route path="/college-essentials" element={<CollegeEssentialsPage />} />
-                  <Route path="/how-it-works" element={<HowItWorksPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <ErrorBoundary>
+      <AuthProvider>
+        <ItemsProvider>
+          <Router>
+            <ScrollToTop />
+            <div className="outer-viewport">
+              <div className="app-canvas">
+                <Navbar />
+                <main className="main-content" id="main-content">
+                  <Routes>
+                    {/* Public Browsing Routes */}
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/explore" element={<ExplorePage />} />
+                    <Route path="/college-essentials" element={<CollegeEssentialsPage />} />
+                    <Route path="/how-it-works" element={<HowItWorksPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-                  {/* Protected Student Routes */}
-                  <Route
-                    path="/donate"
-                    element={
-                      <ProtectedRoute>
-                        <DonatePage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/my-donations"
-                    element={
-                      <ProtectedRoute>
-                        <MyDonationsPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/my-requests"
-                    element={
-                      <ProtectedRoute>
-                        <MyRequestsPage />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/profile"
-                    element={
-                      <ProtectedRoute>
-                        <ProfilePage />
-                      </ProtectedRoute>
-                    }
-                  />
+                    {/* Protected Student Routes */}
+                    <Route
+                      path="/donate"
+                      element={
+                        <ProtectedRoute>
+                          <DonatePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/my-donations"
+                      element={
+                        <ProtectedRoute>
+                          <MyDonationsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/my-requests"
+                      element={
+                        <ProtectedRoute>
+                          <MyRequestsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/profile"
+                      element={
+                        <ProtectedRoute>
+                          <ProfilePage />
+                        </ProtectedRoute>
+                      }
+                    />
 
-                  {/* Fallback route */}
-                  <Route path="*" element={<HomePage />} />
-                </Routes>
-              </main>
-              <Footer />
+                    {/* 404 — proper not-found page instead of silently rendering home */}
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </main>
+                <Footer />
+              </div>
             </div>
-          </div>
 
-          {/* Global Details Modal & Toast Notification */}
-          <ItemDetailModal />
-          <Toast />
-        </Router>
-      </ItemsProvider>
-    </AuthProvider>
+            {/* Global Details Modal & Toast Notification */}
+            <ItemDetailModal />
+            <Toast />
+          </Router>
+        </ItemsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
+
