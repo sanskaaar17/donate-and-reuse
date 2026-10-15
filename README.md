@@ -83,4 +83,33 @@ Use two independent browser profiles (or one normal and one private window), and
 8. As A, decline a different pending request and verify it is reflected for the requester. Complete a reserved handover and verify the listing becomes Completed.
 9. Cancel a pending request as its requester, delete an owned listing, and confirm both dashboards refresh. Try direct browser reloads on protected routes after logging out and after the auth session expires.
 
-This repository has no automated test script configured. `npm run build` is the available repository-level verification command; the two-account and database-policy checks above require an actual Supabase project and must be run manually.
+The manual cases cover browser behavior and policies that the automated suites also exercise at API level.
+
+## Automated development-project tests
+
+The browser test verifies a signed-out visitor can browse a newly-created donation, Account A can log in and publish it, Account B can request it, only A can accept, and both dashboards show the final Reserved/Accepted state. A separate API-level suite exercises RLS, ownership, request status restrictions, and Storage folder/MIME permissions. Browser assertions alone do not validate the database security policies.
+
+These tests create and remove a donation and upload a temporary test image. **Run them only against a separate development Supabase project** with `supabase/schema.sql` already applied and two confirmed disposable accounts. The runner refuses to target the project configured in the app's `.env`.
+
+Create an ignored local file named `.env.e2e.local` in the repository root:
+
+```env
+E2E_TARGET=development
+E2E_SUPABASE_URL=https://your-development-project.supabase.co
+E2E_SUPABASE_PUBLISHABLE_KEY=your-development-publishable-key
+E2E_DONOR_EMAIL=donor-test@example.com
+E2E_DONOR_PASSWORD=your-donor-test-password
+E2E_REQUESTER_EMAIL=requester-test@example.com
+E2E_REQUESTER_PASSWORD=your-requester-test-password
+```
+
+Never commit this file or use the production project/key. If the Playwright browser is not installed yet, run `npx playwright install chromium`.
+
+Run the tests independently:
+
+```bash
+npm run test:e2e:ui
+npm run test:e2e:api
+```
+
+The API suite specifically verifies anonymous read/create rules, donor ownership, requester spoofing, duplicate/self/unavailable requests, donor-only acceptance, requester-only dashboards, profile contact privacy, and Storage upload ownership/MIME restrictions. Review and reset the disposable dev accounts/data after testing.

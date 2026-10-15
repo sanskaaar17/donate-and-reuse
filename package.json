@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e:ui": "playwright test",
+    "test:e2e:api": "node e2e_test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
@@ -16,7 +18,13 @@
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.1"
+    "jsdom": "^30.1.3",
+    "vite": "^6.0.1",
+    "vitest": "^5.0.4"
   }
 }
